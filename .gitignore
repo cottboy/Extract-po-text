@@ -1,0 +1,20 @@
+# Byte-code files
+*.pyc
+__pycache__/
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# PyInstaller files
+build/
+dist/
+*.spec
+
+# Operating System files
+.DS_Store
+thumbs.db
+
+# Other generated files
+*.log
+*.tmp
