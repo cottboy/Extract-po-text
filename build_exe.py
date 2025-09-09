@@ -41,7 +41,9 @@ def build_exe():
     
     # PyInstaller命令参数
     pyinstaller_args = [
-        "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--onefile",                    # 打包成单个exe文件
         "--windowed",                   # 不显示控制台窗口（GUI程序）
         "--name=Extract-po-text",       # 可执行文件名称
@@ -104,8 +106,6 @@ def main():
         print("\n提示: 您可以将 dist/Extract-po-text.exe 复制到任何地方使用。")
     else:
         print("\n❌ 打包失败，请检查错误信息。")
-    
-    input("\n按回车键退出...")
 
 if __name__ == "__main__":
     main()
