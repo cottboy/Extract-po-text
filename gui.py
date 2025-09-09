@@ -217,28 +217,17 @@ class POTranslatorGUI:
         
         def generate_task():
             try:
-                # 导入翻译文本
-                translations = self.text_processor.import_texts_from_file(self.current_import_file)
+                # 获取语言代码
+                language_code = self.language_code_var.get().strip()
                 
-                if not translations:
-                    messagebox.showerror("错误", "无法读取翻译文件")
+                # 使用新的导入方法（支持复数形式）
+                success = self.po_parser.import_translations_from_txt(self.current_import_file, language_code)
+                
+                if not success:
+                    messagebox.showerror("错误", "导入翻译文件失败")
                     return
-                
-                # 验证翻译数量
-                untranslated_count = len(self.po_parser.get_untranslated_texts())
-                is_valid, message = self.text_processor.validate_translation_count(untranslated_count, translations)
-                
-                if not is_valid:
-                    messagebox.showerror("错误", message)
-                    return
-                
-                # 应用翻译
-                for i, translation in enumerate(translations):
-                    if i < len(self.po_parser.untranslated_entries):
-                        self.po_parser.untranslated_entries[i].msgstr = self.text_processor.clean_text(translation)
                 
                 # 保存翻译后的PO文件
-                language_code = self.language_code_var.get().strip()
                 success = self.po_parser.save_translated_po(file_path, language_code)
                 
                 if success:

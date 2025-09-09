@@ -81,20 +81,6 @@ def build_exe():
                 print(f"  路径: {exe_file}")
                 print(f"  大小: {file_size:.1f} MB")
                 
-                # 创建一个简单的使用说明
-                readme_file = dist_dir / "使用说明.txt"
-                with open(readme_file, 'w', encoding='utf-8') as f:
-                    f.write("Extract-po-text 可执行文件使用说明\n")
-                    f.write("=" * 40 + "\n\n")
-                    f.write("1. 双击 Extract-po-text.exe 启动程序\n")
-                    f.write("2. 程序会打开图形界面\n")
-                    f.write("3. 选择PO文件进行处理\n\n")
-                    f.write("注意事项:\n")
-                    f.write("- 首次启动可能需要几秒钟时间\n")
-                    f.write("- 确保有足够的磁盘空间\n")
-                    f.write("- 如遇问题请检查防病毒软件设置\n")
-                
-                print(f"\n已创建使用说明: {readme_file}")
                 return True
             else:
                 print("\n✗ 错误: 未找到生成的exe文件")

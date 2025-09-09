@@ -154,6 +154,10 @@ class TextProcessor:
         texts = []
         numbered_pattern = re.compile(r'^\d+\.\s*(.+)$')
         
+        # 将换行占位符还原为真实换行
+        def _restore_newlines(s: str) -> str:
+            return s.replace('<NEWLINE_PLACEHOLDER_114514>', '\n')
+        
         for line in lines:
             line = line.strip()
             if not line or line.startswith('#'):
@@ -161,11 +165,11 @@ class TextProcessor:
             
             match = numbered_pattern.match(line)
             if match:
-                texts.append(match.group(1))
+                texts.append(_restore_newlines(match.group(1)))
             else:
                 # 如果不匹配编号格式，可能是多行文本的续行
                 if texts:
-                    texts[-1] += ' ' + line
+                    texts[-1] += ' ' + _restore_newlines(line)
         
         return texts
     
@@ -174,10 +178,14 @@ class TextProcessor:
         lines = content.strip().split('\n')
         texts = []
         
+        # 将换行占位符还原为真实换行
+        def _restore_newlines(s: str) -> str:
+            return s.replace('<NEWLINE_PLACEHOLDER_114514>', '\n')
+        
         for line in lines:
             line = line.strip()
             if line and not line.startswith('#'):
-                texts.append(line)
+                texts.append(_restore_newlines(line))
         
         return texts
     
