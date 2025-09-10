@@ -525,7 +525,7 @@ class POParser:
         if not self.po_file:
             return
         for entry in self.po_file:
-            # 源占位符合并：msgid 与 msgid_plural（若有）
+            # 源占位符符合并：msgid 与 msgid_plural（若有）
             src_tokens = []
             src_tokens += self._extract_placeholders(entry.msgid or "")
             if getattr(entry, 'msgid_plural', None):
@@ -579,13 +579,15 @@ class POParser:
                     self.plural_entries_map[i] = {
                         'msgid': entry.msgid,
                         'msgid_plural': entry.msgid_plural,
-                        'is_plural': True
+                        'is_plural': True,
+                        'export_plural_count': None  # 将在导出时动态计算
                     }
                 else:
                     self.plural_entries_map[i] = {
                         'msgid': entry.msgid,
                         'msgid_plural': None,
-                        'is_plural': False
+                        'is_plural': False,
+                        'export_plural_count': 1  # 普通条目只有1行
                     }
             
             return True
@@ -594,9 +596,12 @@ class POParser:
             print(f"加载PO/POT文件失败: {e}")
             return False
     
-    def get_untranslated_texts(self) -> List[str]:
+    def get_untranslated_texts(self, language_code: str = None) -> List[str]:
         """
         获取所有待翻译的文本（包括复数形式，不带标记）
+        
+        Args:
+            language_code: 目标语言代码，用于确定复数形式数量
         
         Returns:
             List[str]: 待翻译文本列表
@@ -615,14 +620,30 @@ class POParser:
         texts = []
         for i, entry in enumerate(self.untranslated_entries):
             if self.plural_entries_map[i]['is_plural']:
-                # 复数条目：根据PO文件头部信息确定复数形式数量
-                plural_count = self._get_plural_count_from_po()
-                texts.append(_one_line(entry.msgid))  # 单数形式
-                texts.append(_one_line(entry.msgid_plural))  # 复数形式
+                # 复数条目：根据目标语言确定复数形式数量
+                if language_code:
+                    plural_count = self._get_plural_count(language_code)
+                else:
+                    plural_count = self._get_plural_count_from_po()
                 
-                # 如果需要更多复数形式，重复添加复数形式
-                for _ in range(2, plural_count):
-                    texts.append(_one_line(entry.msgid_plural))
+                # 根据复数形式数量导出对应行数
+                if plural_count == 1:
+                    # 只有1种复数形式的语言（如中文），只导出单数形式
+                    texts.append(_one_line(entry.msgid))
+                    export_count = 1
+                else:
+                    # 多种复数形式的语言，导出单数和复数形式
+                    texts.append(_one_line(entry.msgid))  # 单数形式
+                    texts.append(_one_line(entry.msgid_plural))  # 复数形式
+                    export_count = 2
+                    
+                    # 如果需要更多复数形式，重复添加复数形式
+                    for _ in range(2, plural_count):
+                        texts.append(_one_line(entry.msgid_plural))
+                        export_count += 1
+                
+                # 记录实际导出的行数
+                self.plural_entries_map[i]['export_plural_count'] = export_count
             else:
                 # 普通条目
                 texts.append(_one_line(entry.msgid))
@@ -669,12 +690,13 @@ class POParser:
             "untranslated": untranslated
         }
     
-    def export_untranslated_to_txt(self, output_path: str) -> bool:
+    def export_untranslated_to_txt(self, output_path: str, language_code: str = None) -> bool:
         """
         将待翻译文本导出到TXT文件（支持动态复数形式，不带标记）
         
         Args:
             output_path: 输出文件路径
+            language_code: 目标语言代码（可选），用于确定复数形式数量；若未提供，则从PO头Plural-Forms推断
             
         Returns:
             bool: 导出成功返回True，失败返回False
@@ -695,21 +717,29 @@ class POParser:
                 line_number = 1
                 for i, entry in enumerate(self.untranslated_entries):
                     if self.plural_entries_map[i]['is_plural']:
-                        # 复数条目：根据PO文件头部信息确定复数形式数量
-                        plural_count = self._get_plural_count_from_po()
+                        # 复数条目：优先使用传入的language_code，否则从PO头推断
+                        plural_count = self._get_plural_count(language_code) if language_code else self._get_plural_count_from_po()
                         
-                        # 导出单数形式
-                        f.write(f"{line_number}. {_one_line(entry.msgid)}\n")
-                        line_number += 1
-                        
-                        # 导出复数形式
-                        f.write(f"{line_number}. {_one_line(entry.msgid_plural)}\n")
-                        line_number += 1
-                        
-                        # 如果需要更多复数形式，重复导出复数形式
-                        for _ in range(2, plural_count):
+                        if plural_count == 1:
+                            # 对于复数形式数量为1的语言（如中文），只导出单数形式
+                            f.write(f"{line_number}. {_one_line(entry.msgid)}\n")
+                            line_number += 1
+                            # 记录导出行数，供导入解析时使用
+                            self.plural_entries_map[i]['export_plural_count'] = 1
+                        else:
+                            # 对于其他语言，导出单数形式和复数形式
+                            f.write(f"{line_number}. {_one_line(entry.msgid)}\n")
+                            line_number += 1
+                            
                             f.write(f"{line_number}. {_one_line(entry.msgid_plural)}\n")
                             line_number += 1
+                            
+                            # 如果需要更多复数形式，重复导出复数形式
+                            for _ in range(2, plural_count):
+                                f.write(f"{line_number}. {_one_line(entry.msgid_plural)}\n")
+                                line_number += 1
+                            # 记录导出行数，供导入解析时使用
+                            self.plural_entries_map[i]['export_plural_count'] = plural_count
                     else:
                         # 普通条目
                         f.write(f"{line_number}. {_one_line(entry.msgid)}\n")
@@ -722,7 +752,7 @@ class POParser:
         except Exception as e:
             print(f"导出文本失败: {e}")
             return False
-    
+
     def _parse_translations(self, translations: list) -> list:
         """
         解析翻译文本，根据位置识别复数形式
@@ -747,15 +777,16 @@ class POParser:
             
             if self.plural_entries_map[entry_index]['is_plural']:
                 # 复数条目：需要读取多行
-                plural_count = self._get_plural_count_from_po()
+                # 使用导出时实际使用的复数形式数量，而不是目标语言的复数形式数量
+                export_plural_count = self.plural_entries_map[entry_index].get('export_plural_count') or self._get_plural_count_from_po()
                 
-                if translation_index + plural_count > len(translations):
-                    print(f"[DEBUG _parse_translations] plural need {plural_count}, have from {translation_index} to {len(translations)} for entry {entry_index+1}")
-                    raise ValueError(f"复数条目 {entry_index+1} 需要 {plural_count} 行翻译，但剩余翻译行数不足")
+                if translation_index + export_plural_count > len(translations):
+                    print(f"[DEBUG _parse_translations] plural need {export_plural_count}, have from {translation_index} to {len(translations)} for entry {entry_index+1}")
+                    raise ValueError(f"复数条目 {entry_index+1} 需要 {export_plural_count} 行翻译，但剩余翻译行数不足")
                 
                 # 读取所有复数形式
                 plural_forms = {}
-                for i in range(plural_count):
+                for i in range(export_plural_count):
                     form_text = clean_line(translations[translation_index + i])
                     plural_forms[i] = form_text
                 
@@ -766,7 +797,7 @@ class POParser:
                     'plural_forms': plural_forms
                 })
                 
-                translation_index += plural_count
+                translation_index += export_plural_count
             else:
                 # 普通条目：读取一行
                 if translation_index >= len(translations):
@@ -819,23 +850,24 @@ class POParser:
                 # 优先尝试保留空行（某些翻译可能允许为空）
                 parsed_simple = []
                 idx = 0
-                plural_count = self._get_plural_count(language_code) if language_code else self._get_plural_count_from_po()
-                print(f"[import] entries={len(self.untranslated_entries)}, plural_count={plural_count}, simple_lines={len(simple_lines)}")
+                po_plural_count = self._get_plural_count_from_po()
+                print(f"[import] entries={len(self.untranslated_entries)}, po_plural_count={po_plural_count}, simple_lines={len(simple_lines)}")
                 for i, entry in enumerate(self.untranslated_entries):
                     if self.plural_entries_map[i]['is_plural']:
-                        # 需要 plural_count 行
-                        if idx + plural_count > len(simple_lines):
-                            print(f"[DEBUG simple] plural entry {i+1} need {plural_count}, idx={idx}, simple_lines={len(simple_lines)}")
-                            raise ValueError(f"复数条目 {i+1} 需要 {plural_count} 行翻译，但剩余翻译行数不足")
+                        # 使用导出时实际使用的复数形式数量
+                        export_plural_count = self.plural_entries_map[i]['export_plural_count']
+                        if idx + export_plural_count > len(simple_lines):
+                            print(f"[DEBUG simple] plural entry {i+1} need {export_plural_count}, idx={idx}, simple_lines={len(simple_lines)}")
+                            raise ValueError(f"复数条目 {i+1} 需要 {export_plural_count} 行翻译，但剩余翻译行数不足")
                         plural_forms = {}
-                        for j in range(plural_count):
+                        for j in range(export_plural_count):
                             plural_forms[j] = simple_lines[idx + j]
                         parsed_simple.append({
                             'singular': plural_forms.get(0, ''),
                             'plural': plural_forms.get(1, plural_forms.get(0, '')),
                             'plural_forms': plural_forms
                         })
-                        idx += plural_count
+                        idx += export_plural_count
                     else:
                         if idx >= len(simple_lines):
                             # 尝试过滤掉完全空白的行再重试一次
