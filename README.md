@@ -8,3 +8,5 @@
 不想用AI写README文档了，废话一大堆。如果你是程序员，也用不着README文档，如果你不是，那更用不着README文档了，去Releases下载吧。
 
 ![enter image description here](https://m.360buyimg.com/i/jfs/t1/339231/24/6745/5157/68bef7c9F89c684ce/c0ae7eeb5a7e8677.png)
+
+我知道杀软报毒了，我也没办法。反正软件是开源的，自己看源代码吧，不相信我打包的就自己打包😕
