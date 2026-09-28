@@ -1,111 +1,77 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-打包脚本 - 将Extract-po-text程序打包成可执行文件
+"""打包脚本：用 PyInstaller 把 potext 打成单文件可执行程序。
+
+程序本身零第三方依赖，只需要 Python 自带的 tkinter，因此打包很轻。
 """
 
-import os
-import sys
+from __future__ import annotations
+
 import subprocess
-import shutil
+import sys
 from pathlib import Path
 
-def build_exe():
-    """构建可执行文件"""
-    print("=== Extract-po-text 打包工具 ===")
-    
-    # 获取当前目录
-    current_dir = Path(__file__).parent
-    print(f"当前目录: {current_dir}")
-    
-    # 检查主程序文件
-    main_file = current_dir / "main.py"
-    if not main_file.exists():
-        print("错误: 找不到main.py文件")
-        return False
-    
-    # 清理之前的构建文件
-    build_dir = current_dir / "build"
-    dist_dir = current_dir / "dist"
-    spec_file = current_dir / "main.spec"
-    
-    print("\n清理之前的构建文件...")
-    for dir_path in [build_dir, dist_dir]:
-        if dir_path.exists():
-            shutil.rmtree(dir_path)
-            print(f"已删除: {dir_path}")
-    
-    if spec_file.exists():
-        spec_file.unlink()
-        print(f"已删除: {spec_file}")
-    
-    # PyInstaller命令参数
-    pyinstaller_args = [
+EXE_NAME = "Extract-po-text"
+BUILD_DIRS = ("build", "dist")
+
+
+def _clean(root: Path) -> None:
+    import shutil
+
+    for name in (*BUILD_DIRS, f"{EXE_NAME}.spec"):
+        target = root / name
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.exists():
+            target.unlink()
+        print(f"已清理: {target}")
+
+
+def _command(main_file: Path) -> list[str]:
+    return [
         sys.executable,
         "-m",
         "PyInstaller",
-        "--onefile",                    # 打包成单个exe文件
-        "--windowed",                   # 不显示控制台窗口（GUI程序）
-        "--name=Extract-po-text",       # 可执行文件名称
-        "--icon=NONE",                  # 暂时不设置图标
-        "--add-data=requirements.txt;.", # 包含requirements.txt
-        "--hidden-import=tkinter",      # 确保tkinter被包含
-        "--hidden-import=tkinter.ttk",  # 确保tkinter.ttk被包含
-        "--hidden-import=tkinter.filedialog", # 确保文件对话框被包含
-        "--hidden-import=tkinter.messagebox", # 确保消息框被包含
-        "--hidden-import=polib",        # 确保polib被包含
-        "--collect-all=polib",          # 收集polib的所有依赖
-        "--noconfirm",                  # 不询问确认
-        str(main_file)                   # 主程序文件
+        "--onefile",
+        "--windowed",  # 图形界面程序，不附带控制台
+        f"--name={EXE_NAME}",
+        "--hidden-import=tkinter",
+        "--hidden-import=tkinter.ttk",
+        "--hidden-import=tkinter.filedialog",
+        "--hidden-import=tkinter.messagebox",
+        "--hidden-import=tkinter.scrolledtext",
+        "--noconfirm",
+        str(main_file),
     ]
-    
-    print("\n开始打包...")
-    print(f"执行命令: {' '.join(pyinstaller_args)}")
-    
-    try:
-        # 执行PyInstaller
-        result = subprocess.run(
-            pyinstaller_args,
-            cwd=current_dir,
-            capture_output=True,
-            text=True,
-            encoding='utf-8'
-        )
-        
-        if result.returncode == 0:
-            print("\n✓ 打包成功！")
-            
-            # 检查生成的exe文件
-            exe_file = dist_dir / "Extract-po-text.exe"
-            if exe_file.exists():
-                file_size = exe_file.stat().st_size / (1024 * 1024)  # MB
-                print(f"\n生成的可执行文件:")
-                print(f"  路径: {exe_file}")
-                print(f"  大小: {file_size:.1f} MB")
-                
-                return True
-            else:
-                print("\n✗ 错误: 未找到生成的exe文件")
-                return False
-        else:
-            print("\n✗ 打包失败！")
-            print("错误输出:")
-            print(result.stderr)
-            return False
-            
-    except Exception as e:
-        print(f"\n✗ 打包过程中出现异常: {e}")
+
+
+def build() -> bool:
+    root = Path(__file__).parent
+    main_file = root / "main.py"
+    if not main_file.is_file():
+        print(f"错误: 找不到入口文件 {main_file}")
         return False
 
-def main():
-    """主函数"""
-    success = build_exe()
-    
-    if success:
-        print("\n🎉 打包完成！可执行文件位于 dist 目录中。")
-        print("\n提示: 您可以将 dist/Extract-po-text.exe 复制到任何地方使用。")
-    else:
-        print("\n❌ 打包失败，请检查错误信息。")
+    print(f"=== {EXE_NAME} 打包 ===")
+    print(f"工作目录: {root}")
+    _clean(root)
+
+    command = _command(main_file)
+    print("\n开始打包...")
+    result = subprocess.run(command, cwd=root, capture_output=True, text=True, encoding="utf-8")
+    if result.returncode != 0:
+        print("打包失败：")
+        print(result.stdout)
+        print(result.stderr)
+        return False
+
+    exe = root / "dist" / f"{EXE_NAME}.exe"
+    if not exe.is_file():
+        print(f"打包结束但没有找到 {exe}")
+        return False
+
+    print(f"打包成功: {exe}（{exe.stat().st_size / 1024 / 1024:.1f} MB）")
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(0 if build() else 1)

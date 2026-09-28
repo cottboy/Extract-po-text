@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "extract-po-text"
+version = "2.0.0"
+description = "把 PO 文件里所有待翻译字段一次性导出、翻译后整体回填的工作台"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "cottboy" }]
+keywords = ["po", "pot", "gettext", "i18n", "translation"]
+dependencies = []
+
+[project.scripts]
+potext = "potext.cli:main"
+
+[project.gui-scripts]
+potext-gui = "potext.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["potext*"]
