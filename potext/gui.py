@@ -1,5 +1,6 @@
 """Tkinter 图形界面。
 
+外观走 Windows 原生的 ttk vista 主题，非 Windows 平台保持各系统默认主题。
 所有耗时操作都在工作线程里跑，结果经队列回传，主线程轮询后再弹窗与刷新日志——
 Tk 的组件与对话框都不能从子线程调用。
 """
@@ -20,27 +21,32 @@ from .workbook import ApplyReport, ExtractReport, Options
 PO_TYPES = [("PO/POT 文件", "*.po *.pot"), ("PO 文件", "*.po"), ("POT 文件", "*.pot"), ("所有文件", "*.*")]
 TXT_TYPES = [("文本文件", "*.txt"), ("所有文件", "*.*")]
 POLL_MS = 120
+UI_FONT = "Microsoft YaHei UI"
 
 
 class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("PO 文件批量翻译工具")
-        self.geometry("640x620")
         self.minsize(560, 520)
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._worker: threading.Thread | None = None
         self._busy = False
         self._build()
+        # vista 主题的控件比 clam 高，写死尺寸会把日志区挤出窗口，改为按布局实际请求的大小开窗
+        self.update_idletasks()
+        self.geometry(f"{self.winfo_reqwidth()}x{min(self.winfo_reqheight(), self.winfo_screenheight() - 60)}")
         self.after(POLL_MS, self._poll)
 
     # ------- 界面 -------
 
     def _build(self) -> None:
         style = ttk.Style(self)
-        if "clam" in style.theme_names():
-            style.theme_use("clam")
-        style.configure("Title.TLabel", font=("Microsoft YaHei UI", 11, "bold"))
+        # vista 是 Windows 的原生外观；clam 是跨平台的复古扁平主题，在这上面显旧
+        if "vista" in style.theme_names():
+            style.theme_use("vista")
+        style.configure(".", font=(UI_FONT, 9))
+        style.configure("Title.TLabel", font=(UI_FONT, 11, "bold"))
 
         root = ttk.Frame(self, padding=12)
         root.pack(fill=tk.BOTH, expand=True)
@@ -110,7 +116,7 @@ class App(tk.Tk):
         log.grid(row=6, column=0, sticky="nsew", pady=(8, 0))
         log.columnconfigure(0, weight=1)
         log.rowconfigure(0, weight=1)
-        self.log_view = scrolledtext.ScrolledText(log, height=10, state="disabled", font=("Microsoft YaHei UI", 9))
+        self.log_view = scrolledtext.ScrolledText(log, height=10, state="disabled", font=(UI_FONT, 9))
         self.log_view.grid(row=0, column=0, sticky="nsew")
 
     # ------- 路径选择 -------
