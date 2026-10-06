@@ -32,6 +32,7 @@ class App(tk.Tk):
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._worker: threading.Thread | None = None
         self._busy = False
+        self._task_done: Callable[[object], None] = lambda _result: None
         self._build()
         # vista 主题的控件比 clam 高，写死尺寸会把日志区挤出窗口，改为按布局实际请求的大小开窗
         self.update_idletasks()
@@ -154,7 +155,9 @@ class App(tk.Tk):
         po, out = self._require(self.po_path, "请先选择 PO / POT 文件"), self._require(self.export_path, "请指定导出文件路径")
         if not (po and out):
             return
-        self._submit(lambda: Session(po).export(out, self._options()), self._on_extract)
+        # 选项里的 StringVar/BooleanVar 只能在主线程读取，先在主线程快照再进工作线程
+        options = self._collect_options()
+        self._submit(lambda: Session(po).export(out, options), self._on_extract)
 
     def _verify(self) -> None:
         self._apply(write=False)
@@ -168,9 +171,10 @@ class App(tk.Tk):
         out = self._require(self.output_path, "请指定输出 PO 路径") if write else None
         if not po or not txt or (write and not out):
             return
-        self._submit(lambda: Session(po).apply(txt, out, self._options()), self._on_apply)
+        options = self._collect_options()
+        self._submit(lambda: Session(po).apply(txt, out, options), self._on_apply)
 
-    def _options(self) -> Options:
+    def _collect_options(self) -> Options:
         lang = self.target_lang.get().strip() or None
         forms = self.plural_forms.get().strip() or None
         return Options(
@@ -217,15 +221,21 @@ class App(tk.Tk):
         except queue.Empty:
             self.after(POLL_MS, self._poll)
             return
-        self._busy = False
-        for button in (self.export_button, self.verify_button, self.generate_button):
-            button.state(["!disabled"])
-        if kind == "error":
-            self._log([f"失败：{payload}"])
-            messagebox.showerror("操作失败", str(payload), parent=self)
-        else:
-            self._task_done(payload)
-        self.after(POLL_MS, self._poll)
+        try:
+            self._busy = False
+            for button in (self.export_button, self.verify_button, self.generate_button):
+                button.state(["!disabled"])
+            if kind == "error":
+                self._log([f"失败：{payload}"])
+                messagebox.showerror("操作失败", str(payload), parent=self)
+            else:
+                try:
+                    self._task_done(payload)
+                except Exception as error:  # 回调异常不能杀死轮询，否则按钮永久卡死
+                    self._log([f"失败：结果展示时出错：{error}"])
+                    messagebox.showerror("操作失败", f"结果展示时出错：{error}", parent=self)
+        finally:
+            self.after(POLL_MS, self._poll)
 
     def _on_stats(self, result: object) -> None:
         summary = getattr(result, "summary", lambda: [str(result)])()
