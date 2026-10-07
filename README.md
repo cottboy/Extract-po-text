@@ -1,4 +1,4 @@
-![界面截图](https://m.360buyimg.com/i/jfs/t1/339231/24/6745/5157/68bef7c9F89c684ce/c0ae7eeb5a7e8677.png)
+![界面截图](https://ps.ssl.qhimg.com/t02466fc46fd900a552.jpg)
 
 想把一个 WordPress 主题整个汉化，却发现没有工具能一次性把所有待翻译文本导出来，只能一条条复制——于是有了这个小玩意。
 
